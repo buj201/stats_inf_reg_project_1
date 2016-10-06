@@ -1,0 +1,7 @@
+base
+knitr
+reshape2
+ggplot2
+Matrix
+foreach
+glmnet

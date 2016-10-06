@@ -1,0 +1,242 @@
+---
+title: "Explaining Somatype"
+author: "Benjamin Jakubowski"
+header-includes:
+   - \usepackage{placeins}
+date: "April 16, 2016"
+output:
+  pdf_document:
+    number_sections: true
+    fig_caption: true
+---
+
+\section{Introduction}
+
+In this report, we build the best explanatory model for somatotype using data from the Berkley Guidance Study. As noted in the assignment introduction,  
+
+> *The Berkeley Guidance Study, under the direction of Jean Macfarlane, started with a sample of infants who were born in Berkeley, California in 1928-1929. Most of the children were Caucasian and Protestant, and two-thirds came from middle-class families. The basic cohort includes 136 of these children who participated in the study through the 1930s and up to the end of World War II. Annual data collection ended in 1946.*
+
+Our objective in this analysis is to use the features collected during this study to predict participants' somatypes. Features available include
+
+\begin{itemize}
+\item \textbf{Sex}: 0 = males, 1 = females
+\item \textbf{WT2}: Age 2 weight (kg)
+\item \textbf{HT2}: Age 2 height (cm)
+\item \textbf{WT9}: Age 9 weight (kg)
+\item \textbf{HT9}: Age 9 height (cm)
+\item \textbf{LG9}: Age 9 leg circumference (cm)
+\item \textbf{ST9}: Age 9 strength (kg)
+\item \textbf{WT18}: Age 18 weight (kg)
+\item \textbf{HT18}: Age 18 height (cm)
+\item \textbf{LG18}: Age 18 leg circumference (cm)
+\item \textbf{ST18}: Age 18 strength (kg)
+\item \textbf{Soma}: Somatotype, a 1 to 7 scale of body type.
+\end{itemize}
+
+\section{Exploratory Analysis}
+
+\subsection{Tabular summaries}
+
+First, we present tabular summaries of the features in this dataset. We first present tabular summaries for continous features for the entire dataset (Table 1), then we present summaries for continuous features disaggregated by gender (Tables 2 and 3). Finally, we present summaries for our discrete features (Tables 4 and 5):
+
+```{r, echo=FALSE}
+setwd("~/Desktop/MS_Courses/Stats_inf_regression/Project_1")
+BGS = read.csv('BGS.csv', row.names=c(1))
+girls = BGS[BGS$Sex == 1,]
+boys = BGS[BGS$Sex == 0,]
+
+get_cont_summary = function(dataframe){
+  continuous_data = dataframe[,!(names(dataframe) %in% c('Sex', 'Soma'))]
+  sample_mean = apply(continuous_data, 2, mean)
+  sample_sd = apply(continuous_data, 2, sd)
+  sample_median = apply(continuous_data,2,median)
+  sample_min = apply(continuous_data, 2, min)
+  sample_max = apply(continuous_data, 2, max)
+  
+  summary_cont = t(data.frame(sample_mean, sample_sd, sample_median, sample_min, sample_max))
+  row.names(summary_cont) = c('Sample mean', 'Sample SD','Sample median', 'Sample min', 'Sample max')
+  return(summary_cont)
+}
+
+get_sex_summary = function(dataframe){
+  sex_table = table(dataframe[,c('Sex')])
+  sex_table = cbind(sex_table, sex_table / sum(sex_table))
+  colnames(sex_table) = c('Count', 'Sample proportion')
+  return(sex_table)
+}
+
+get_soma_summary = function(BGS){
+  girls = BGS[BGS$Sex == 1,]
+  boys = BGS[BGS$Sex == 0,]
+  girls_soma_table = as.data.frame(table(girls[,c('Soma')]),stringsAsFactors=FALSE)
+  girls_soma_table[,'Perc_girls'] = girls_soma_table$Freq / sum(girls_soma_table$Freq)
+  boys_soma_table =  as.data.frame(table(boys[,c('Soma')]),stringsAsFactors=FALSE)
+  boys_soma_table[,'Perc_boys'] = boys_soma_table$Freq / sum(boys_soma_table$Freq)
+  soma_table = merge(girls_soma_table, boys_soma_table, by = c('Var1'), all = TRUE)
+  soma_table[is.na(soma_table)] = 0
+  colnames(soma_table) = c('Soma', 'Count- girls', 'Sample proportion- girls', 'Count- boys', 'Sample proportion- boys')
+  soma_table$Soma = as.numeric(soma_table$Soma)
+  soma_table = soma_table[order(soma_table$Soma),]
+  return(soma_table)
+}
+```
+
+```{r, echo=FALSE}
+library(knitr)
+kable(get_cont_summary(BGS), format='latex',digits = 2, caption = 'Summary of continuous features- both genders')
+kable(get_cont_summary(boys), format='latex',digits = 2, caption = 'Summary of continuous features- boys')
+kable(get_cont_summary(girls), format='latex',digits = 2, caption = 'Summary of continuous features- girls')
+kable(get_soma_summary(BGS), format='latex',digits = 2, caption = 'Summary of soma distribution- both genders')
+kable(get_sex_summary(BGS), format='latex',digits = 2, caption = 'Summary of sex distribution')
+
+```
+
+\subsection{Figures for exploratory analysis}
+
+Next, we present figures to support further exploration of the data. We present two figures:
+\begin{itemize}
+\item \textbf{Figure 1}: This figure summarizes the conditional distributions of each numeric feature (conditioning on sex) using boxplots.
+\item \textbf{Figure 2}: This figure summarizes the pairwise distributions of somatype and  numeric feature (coloring by sex) using scatter plots.
+\end{itemize}
+
+```{r, echo = FALSE, fig.cap = 'Comparing numeric feature distributions by sex (0 = Male, 1 = Female)', fig.width=8, fig.height=3.65}
+library(reshape2)
+library(ggplot2)
+meltData <- melt(BGS, id=c("Sex"))
+p <- ggplot(meltData, aes(factor(variable), value)) 
+p + geom_boxplot(aes(x=as.factor(Sex), fill=factor(Sex))) + facet_wrap(~variable, scale="free", nrow=2) + ylab('Numeric feature value') + xlab('Numeric feature split by sex (0 = Male, 1 = Female)') + labs(fill='Sex')
+```
+
+
+```{r, echo = FALSE, fig.cap = 'Somatype value vs numeric feature value by sex (0 = Male, 1 = Female)', fig.width=8, fig.height=3.65}
+library(reshape2)
+meltData <- melt(BGS, id=c("Sex", "Soma"))
+p <- ggplot(meltData, aes(factor(variable), value)) 
+p + geom_point(aes(x=value, y=Soma, colour=factor(Sex))) + facet_wrap(~variable, scale="free", nrow=2) + ylab('Somatype value (0-7)') + xlab('Continuous feature') + labs(colour='Sex')
+```
+
+We can interpret these plots as follows:
+\begin{itemize}
+\item \textbf{Figure 1}: Looking at this figure, it is apparent a number of features differ significantly based on sex. Most significantly, it appears HT18 (height at age 18), ST18 (strength at age 18), and Soma (somatype) all have substantially different distributions conditioning on sex.
+\item \textbf{Figure 2}: In this figure we can see the pairwise relationships between each predictor and the target variable (Soma), split by sex. It is apparent from these plots that these pairwise distributions are signifcantly different between boys and girls.
+\end{itemize}
+
+Overall, based on these figures, it is apparent the conditional distributions $F_{Soma, Feature | Sex}$ differ dramatically for boys and girls. Thus, when modeling we are justified in including all the $Sex:Feature$ interaction terms.
+
+\section{Modeling and Inference}
+
+Next, we proceed to build an explantory model. Based on the assignment instructions (and our exploratory analysis), we constrain candidate models (i.e. our hypothesis space) to *include additive relationships among any of the variables, as well as any two-way interaction term with gender*. To chose our model from this hypothesis space, we will use the following procedure:
+
+\begin{enumerate}
+\item We will use lasso ($\ell_1$ regularized linear regression), since $\ell_1$ regularization promotes sparse coefficient vectors and thus achieves implicit feature selection. Note this model building methodology is preferred to stepwise methods, which are unstable (i.e. greedy) algorithms\footnote{For justification of this choice, see http://andrewgelman.com/2014/06/02/hate-stepwise-regression/}.
+\item Recall the general lasso objective is $\min_{\beta \in \mathbb{R}^p} \left[\frac{1}{N} ||y - X\beta||_2^2 + \lambda ||\beta||_1\right]$. Thus, we need to optimize the regularization hyperparameter $\lambda$. To do so, we will use 10-fold cross-validation.
+\item For our final model, we will select the model corresponding to the highest regularization (largest $\lambda$) such that the mean squared error is within one standard error of the objective minimum. This is shown by the right-most dotted line in Figure 3.
+\item We will use the glmnet package \footnote{See https://web.stanford.edu/\~hastie/glmnet/glmnet\_alpha.html} to fit the model. This package fits generalized linear models via penalized maximum likelihood.
+\end{enumerate} 
+
+```{r echo = FALSE, message=FALSE}
+library(glmnet)
+```
+\FloatBarrier
+
+```{r, echo=FALSE, fig.cap='Using cross validation to optimize regularization', cache=TRUE, fig.height=3.2}
+X = model.matrix(~0 + Sex + WT2 + HT2 + WT9 + LG9 + ST9 + WT18 + HT18 + LG18 + ST18 + Sex:(WT2 + HT2 + WT9 + LG9 + ST9 + WT18 + HT18 + LG18 + ST18), data = BGS)
+y = BGS$Soma
+set.seed(3513643)
+cvfit = cv.glmnet(X, y, nlambda = 100,nfolds = 10)
+plot(cvfit)
+```
+
+The coefficients from the regularized regression model are shown in Table 6.
+\FloatBarrier
+```{r echo=FALSE}
+coefs = as.matrix(coef(cvfit, s = "lambda.1se"))
+not_zero = coefs[coefs != 0,]
+kable(t(not_zero), format='latex', digits = 3, caption = 'Non-zero coefficients of final lasso model')
+```
+\FloatBarrier
+Next, note we can't retrieve standard errors, t-statistics, or p-values for individual coefficients from our lasso model. To get standard errors (or otherwise estimate uncertainty in our coefficient estimates), we will bootstrap. Specifically, we will
+
+\begin{itemize}
+\item Generate 500 bootstrap samples
+\item For each sample, we'll fit the lasso model using our optimal $\lambda_{1SE} =$ `r round(cvfit$lambda.1se,4)`, and determine the model coefficients for the features selected above.
+\item Finally, we'll determine mean values for these coefficients, as well as the 2.5\% and 97.5\% quantile of the bootstraped distributions (presented in figure 4 and table 7).
+\end{itemize}
+
+```{r, echo=FALSE, cache=TRUE}
+all_data = cbind(X,y)
+coefficients = matrix(0, 500, 20)
+for(i in 1:500){
+  bootsample = all_data[sample(136, replace=T),]
+  boot_X = bootsample[,(colnames(bootsample)!='y')]
+  boot_y = bootsample[,c('y')]
+  model = glmnet(boot_X, boot_y)
+  coef.exact = coef(model, s = cvfit$lambda.1se, exact = TRUE)
+  coefficients[i,] = t(as.matrix(coef.exact))
+}
+colnames(coefficients) = rownames(coef.exact)
+target_vars = coefficients[,names(not_zero)]
+```
+
+```{r, echo=FALSE,error=FALSE, fig.cap='Bootstrap sample estimates of l1 regularized coefficients', fig.height=4}
+meltCoefs = melt(target_vars)
+p = ggplot(meltCoefs, aes(x = value))
+p + geom_histogram(aes(y=..density..), bins = 15) + geom_density(color='red') + facet_wrap(~Var2, scale="free", nrow=3, ncol=4) + xlab('Feature in the lasso model') + ylab('Bootstrap estimate of density')
+```
+
+```{r echo = FALSE, message=FALSE}
+library(matrixStats)
+```
+
+```{r, echo=FALSE}
+summary_table = cbind(colQuantiles(target_vars, probs=c(0.025, 0.975)), apply(target_vars,2,mean))
+colnames(summary_table) = c('2.5% Quant.', '97.5% Quant.', 'Mean')
+kable(t(summary_table), format='latex',digits = 3, caption = 'Bootstrap estimate of the lasso coefficents distribution')
+```
+
+Note from these tables it appears a number of features are 'non-significant', in the sense of having 0 weight in a significant proportion of the bootstrapped models. However, we retain these features based on the criterion that this feature set was found to be optimal (i.e. the most regularized model within 1SE of the minimum) through cross validation.
+
+Next, we present residual diagnostics:
+
+```{r echo=FALSE, fig.cap='Residual plot for predictive model', fig.height=3, fig.width=5}
+y_hat = predict(cvfit, X, s = cvfit$lambda.1se)
+resids = y - y_hat
+
+resid_plot_df = data.frame(X[,'Sex'], y_hat, resids)
+colnames(resid_plot_df) = c('Sex','y_hat','Resid')
+
+ggplot(resid_plot_df, aes(x=y_hat, y = Resid)) + geom_point(aes(color = factor(Sex, labels = c('Male','Female')))) + ggtitle('Residual plot') + ylab('Residuals') + xlab('Prediction') + labs(color = "Sex")
+```
+
+This residual plot shows the residuals are fairly evenly distributed around 0 (regardless of predicted value). We don't see constant variance, but again that is not unexpected or unexplained (since it is apparent the variance in residuals differs between boys and girls).
+
+\section{Conclusion}
+
+In this report, we built a model to predict somatype given the following features:
+
+\begin{itemize}
+\item \textbf{Sex}: 0 = males, 1 = females
+\item \textbf{WT2}: Age 2 weight (kg)
+\item \textbf{HT2}: Age 2 height (cm)
+\item \textbf{WT9}: Age 9 weight (kg)
+\item \textbf{HT9}: Age 9 height (cm)
+\item \textbf{LG9}: Age 9 leg circumference (cm)
+\item \textbf{ST9}: Age 9 strength (kg)
+\item \textbf{WT18}: Age 18 weight (kg)
+\item \textbf{HT18}: Age 18 height (cm)
+\item \textbf{LG18}: Age 18 leg circumference (cm)
+\item \textbf{ST18}: Age 18 strength (kg)
+\item \textbf{Soma}: Somatotype, a 1 to 7 scale of body type.
+\end{itemize}
+
+Recall in our exploratory analysis, we
+\begin{itemize}
+\item Noted the significant differences in the distributions of our predictors conditioned on sex (see Figure 1)
+\item Noted that the pairwise distribution of our target and predictors were also significantly different between boys and girls (see Figure 2)
+\end{itemize}
+
+Thus, we chose to fit a model using the avialable features plus all interactions between sex and the continuous predictors. To fit an optimal model over this relatively large feature set (20 features on only 136 observations), we needed to use some form of feature selection. Instead of using a stepwise feature selection procedure, we chose to use lasso (which is a more robust method for implicit feature selection).
+
+Using cross validation to select $\lambda$, we ultimately fit a model with 10 features (including the intercept). Again, the coefficients are given in table 6.
+
+Unfortunately, the relatively large number of features included in this model make interpretation somewhat difficult. However, this is our best explanatory model for the factors that may be associated with somatotype (in the sense of chosing the greatest regularization without significantly sacrificing predictive performance on cross-validation hold-out sets).

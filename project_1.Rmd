@@ -1,0 +1,414 @@
+---
+title: "Project 1"
+author: "Benjamin Jakubowski"
+date: "April 15, 2016"
+output: html_document
+---
+
+# Part 1. Exploring various models
+
+## 1. Model height from age 2 to 9
+
+First, we model height growth from age 2 to age 9.
+
+### (a) Visualizing height growth by gender.
+
+```{r}
+setwd("~/Desktop/MS_Courses/Stats_inf_regression/Project_1")
+BGS = read.csv('BGS.csv', row.names=c(1))
+```
+
+```{r}
+library(ggplot2)
+ggplot(BGS, aes(x = HT2, y = HT9)) + geom_point(aes(color = factor(Sex, labels = c('Male','Female')))) + ggtitle('Height at age 9 vs. 2 by gender') + ylab('Height at age 9') + xlab('Height at age 2') + labs(color = "Sex")
+```
+
+Looking at the scatter plot, it appears that there may be a slight difference in the relationship between height at age 9 and height at age 2 for boys and girls. Specifically, it appears the y-intercept (in a simple regression model) may be slightly lower for boys than for girls.
+
+### (b) Further exploration through modeling
+
+To further explore this relationship, we fit a simple linear regression of heights at age 9 on heights at age 2 (aggregating both genders):
+
+```{r}
+q1b = lm(BGS$HT9 ~ BGS$HT2)
+summary(q1b)
+```
+
+#### Interpreting regression coefficients
+The output regression model is
+$$
+H_9 = \beta_0 + \beta_1 H_2 = 31.93 + 1.18 H_2
+$$
+Thus, if height at age 2 increases by 1 cm, expected height at age 9 increases by 1.18 cm. Note the intercept term doesn't have a meaningful interpretation in the model (since $H_2 = 0$ doesn't occur); it is just a bias term that gives the model greater flexibility.
+
+#### Testing $H_0: \beta_1 = 0$ 
+Next, from the summary output for our linear model, we see the t value for the slope $\beta_1$ is 12.052, corresponding to a p-value near zero. Thus, for any reasonable $\alpha$, we reject $H_0 : \beta_1 = 0$ against the two-sided alternative.
+
+#### Showing T-statistic is $\sqrt{F}$
+Next, we show the value of the T-statistic is the square root of the F-statistic from the output anova.
+
+$$
+T = 12.052 = \sqrt{145.2} = \sqrt{F}
+$$
+
+#### Checking normality and homoscedasticity assumptions
+
+Finally, we check the normality and homoscedasticity assumption of our linear model. We do so by consulting a q-q plot (to check normality) and a residual plot (to assess homoscedasticity).
+
+```{r}
+qqnorm(BGS$HT9)
+qqline(BGS$HT9)
+```
+
+The qq-plot appears relatively normal (with the potential exception of the left tail). Now we consult a residual plot- for additional information, we color the points in the plot based on sex.
+```{r}
+resids = resid(q1b)
+resid_plot_df = data.frame(BGS$Sex, BGS$HT2, resids)
+
+ggplot(resid_plot_df, aes(x = BGS.HT2, y = resids)) + geom_point(aes(color = factor(BGS.Sex, labels = c('Male','Female')))) + ggtitle('Residual plot') + ylab('Residuals') + xlab('Height at age 2') + labs(color = "Sex")
+```
+
+The residuals appear to support the homoscedasticity assumption- the variance of the residuals (conditioned on $H_2$) appears relatively constant, and the mean of the residuals (again conditioned on $H_2$) appears to be approximately 0.
+
+### (c) Adding a dummy for sex
+
+Now we consider a model that allows for a separate intercept for boys and girls:
+
+```{r}
+q1c = lm(BGS$HT9 ~ BGS$HT2 + factor(BGS$Sex))
+summary(q1c)
+```
+
+First, the fit model is
+
+$$
+H_9 = \beta_0 + \beta_1 H_2 + \beta_2 \mathbb{1}(Sex = female) = 30.40 + 1.19 H_2 + 0.57 \mathbb{1}(Sex = female)
+$$
+From the summary output, it is clear the separate intercept does not improve the model, and the dummy term is not statistically significant (based on the T value). We can confirm this through ANOVA:
+
+```{r}
+anova(q1b, q1c)
+```
+Again, we see the model is not improved (and also confirm we see the same p-value for the t-test and nested models F-test).
+
+### (d) Adding a dummy plus interaction term for sex
+
+Now we consider a model that allows for a separate slope and intercept for boys and girls:
+
+```{r}
+q1d = lm(BGS$HT9 ~ BGS$HT2 + factor(BGS$Sex) + factor(BGS$Sex)*BGS$HT2)
+summary(q1d)
+```
+
+First, the fit model is
+
+$$
+H_9 = \beta_0 + \beta_1 H_2 + \beta_2 \mathbb{1}(Sex = female) + \beta_3 \mathbb{1}(Sex = female) \cdot H_2 = 35.17 + 1.14 H_2 - 8.62 \mathbb{1}(Sex = female) + 0.10 \mathbb{1}(Sex = female) \cdot H_2 
+$$
+From the summary output, it is clear the separate slope and intercept do not improve the model, and are not statistically significant (based on the T values).
+
+For fun, let's just confirm this with ANOVA:
+```{r}
+anova(q1b, q1d)
+```
+Again, we see the model is not improved.
+
+## 2. Model height growth from age 9 to 18
+
+In this section, we effectively repeat our analysis, but now compare height growth from age 9 to 18 instead of from age 2 to 9.
+
+### (a) Scatter plot for exploratory analysis:
+
+```{r}
+ggplot(BGS, aes(x = HT9, y = HT18)) + geom_point(aes(color = factor(Sex, labels = c('Male','Female')))) + ggtitle('Height at age 18 vs. 9 by gender') + ylab('Height at age 18') + xlab('Height at age 9') + labs(color = "Sex")
+```
+
+Looking at the scatter plot, it appears that there is a pronounced difference in the relationship between height at age 18 and height at age 9 for boys and girls. Specifically, it appears the y-intercept (in a simple regression model) is significantly higher for boys than for girls.
+
+### (b) Further exploration through modeling
+
+To further explore this relationship, we fit a simple linear regression of heights at age 9 on heights at age 2 (aggregating both genders):
+
+```{r}
+q2b = lm(BGS$HT18 ~ BGS$HT9)
+summary(q2b)
+```
+
+#### Interpreting regression coefficients
+The output regression model is
+$$
+H_{18} = \beta_0 + \beta_1 H_9 = 32.34 + 1.04 H_9
+$$
+Thus, if height at age 9 increases by 1 cm, expected height at age 18 increases by 1.04 cm. Note the intercept term doesn't have a meaningful interpretation in the model (since $H_9 = 0$ doesn't occur); it is just a bias term that gives the model greater flexibility.
+
+#### Checking normality and homoscedasticity assumptions
+
+Again, we check the normality and homoscedasticity assumption of our linear model. We do so by consulting a q-q plot (to check normality) and a residual plot.
+
+```{r}
+qqnorm(BGS$HT18)
+qqline(BGS$HT18)
+```
+
+The qq-plot appears relatively normal. Now we consult a residual plot- for additional information, we color the points in the plot based on sex.
+```{r}
+resids2 = resid(q2b)
+resid_plot_df = data.frame(BGS$Sex, BGS$HT9, resids2)
+
+ggplot(resid_plot_df, aes(x = BGS.HT9, y = resids2)) + geom_point(aes(color = factor(BGS.Sex, labels = c('Male','Female')))) + ggtitle('Residual plot') + ylab('Residuals') + xlab('Height at age 9') + labs(color = "Sex")
+```
+
+The residuals appear to support the homoscedasticity assumption, in the sense of there being relatively constant variance in the residuals regardelss of $H_9$ value. However, the key observation in the residual plot is the (almost complete) partioning of the residuals by sex- this is strong evidence that inclusion of a dummy for sex will improve the model.
+
+### (c) Adding a dummy for sex
+
+Now we consider a model that allows for a separate intercept for boys and girls:
+
+```{r}
+q2c = lm(BGS$HT18 ~ BGS$HT9 + factor(BGS$Sex))
+summary(q2c)
+```
+
+First, the fit model is
+
+$$
+H_{18} = \beta_0 + \beta_1 H_9 + \beta_2 \mathbb{1}(Sex = female) = 48.52 + 0.96 H_9 -11.70 \mathbb{1}(Sex = female)
+$$
+First, let's interpret this model: since the dummy included in the model corresponds to $Sex = female$, we see we are fitting two intercepts:
+$$
+Intercept =
+\begin{cases}
+& 48.52 - 11.70 = 36.82 \qquad{} \textrm{ if } Sex = female \\
+& 48.52 \qquad{} \textrm{ if } Sex = male
+\end{cases}
+$$
+
+From the summary output, it is clear the separate intercept improve the model, and the dummy term is statistically significant (based on the T value). We can confirm this through ANOVA:
+
+```{r}
+anova(q2b, q2c)
+```
+Again, we see the model is improved (and again confirm we see the same p-value for the t-test and nested models F-test).
+
+### (d) Adding a dummy plus interaction term for sex
+
+Now we consider a model that allows for a separate slope and intercept for boys and girls:
+
+```{r}
+q2d = lm(BGS$HT18 ~ BGS$HT9 + factor(BGS$Sex) + factor(BGS$Sex)*BGS$HT9)
+summary(q2d)
+```
+
+Allowing for both different slopes and intercepts, we obtain the following model:
+
+$$
+H_{18} = \beta_0 + \beta_1 H_9 + \beta_2 \mathbb{1}(Sex = female) + \beta_3 \mathbb{1}(Sex = female) \cdot H_9 = 35.07 + 1.06 H_9 + 13.33 \mathbb{1}(Sex = female) - 0.18 \mathbb{1}(Sex = female) \cdot H_9 
+$$
+
+We also see we no longer have significant p-values for the dummy and interaction term. However, we can compare the candidate models using ANOVA:
+```{r}
+anova(q2d, q2c)
+anova(q2d, q2b)
+```
+
+Using this approach, we see that adding $\mathbb{1}(Sex = female) \cdot H_2$ does not further improve the model (having already added $\mathbb{1}(Sex = female)$).
+
+### (e) Chose the best model
+
+Based on the ANOVA (above), the best model is:
+
+$$
+H_{18} = \beta_0 + \beta_1 H_9 + \beta_2 \mathbb{1}(Sex = female) = 48.52 + 0.96 H_9 - 11.70 \mathbb{1}(Sex = female)
+$$
+
+In this model, we effectively have different intercepts for boys and girls, but the same slope $\beta_2 = 0.96$. This slope indicates that as height at age 9 increases by one centimeter, expected height at age 18 increases by 0.96 centimeters.
+
+##3. Modeling boys' growth
+
+In this next section, we analyze only the boys data.
+
+```{r}
+boys = BGS[BGS$Sex == 0,]
+```
+
+### (a) Fitting and comparing two regression models
+
+Next, we fit two regression models:
+
+```{r}
+M1 = lm(boys$WT18 ~ boys$WT9)
+M2 = lm(boys$WT18 ~ boys$WT9 + boys$LG9)
+summary(M1)
+summary(M2)
+```
+
+As we can see in the model summaries, $WT9$ is significant in the first model ($M1$), but not in the second ($M2$). This reveals the problem of collinearity in linear models. The correlation beetween weight at age 9 and leg circumference is `r cor(boys$WT9, boys$LG9)`- due to this high correlation, the $\beta$ estimates are unstable. 
+
+### (b) Exploring hat matrix
+
+Recall $H = X(X^TX)^{-1}X^T$ is the hat matrix (where $X$ is the design matrix). Note diag($H$) gives the leverage of each observation on the fit of the regression model.
+
+#### Why the 'hat' matrix?
+
+This matrix is know as the hat matrix since it 'puts the hat' on y[^1]. Specifically, we know the closed form solution for the coefficients is $\hat{\beta} = (X^TX)^{-1}X^Ty$. Then, the predicted values are
+$$
+\hat{y} = X\hat{\beta} = X(X^TX)^{-1}X^Ty = Hy
+$$
+Thus, we see that the hat matrix is a linear transformation that maps $y \mapsto \hat{y}$.
+
+#### Calculate hat matrix.
+
+Next, we calculate the hat matrix in R. We first code up a function to do this from scratch- then we check that the diagonal of matrix is correct using the built-in hatvalues method. Note I was unclear from the instructions on the problem if I was supposed to actually print the entire matrix- I decided not to, but note the matrix returned by get_hat could easily be displayed.
+
+```{r}
+get_hat = function(X){
+  X = as.matrix(X)
+  ## Note on syntax:
+  ## -solve(A) finds inverse of A
+  ## %*% is matrix mult.
+  ## t(A) is the transpose of A
+  hat = X %*% solve(t(X) %*% X) %*% t(X)
+  return(hat)
+}
+
+
+design = data.frame(rep(1, dim(boys)[1]), boys$WT9)
+hat = get_hat(design)
+num_not_equal = sum(abs(diag(hat) - hatvalues(M1))> 0.000001)
+num_not_equal
+```
+
+As we see, the number of diagonal entries of our hat matrix that are not equal to the built-in hatvalues is `r num_not_equal`, so we know we've successfully found the hat matrix.
+
+Now let's look at the diagonal values (leverage) using a box plot:
+```{r}
+boxplot(hatvalues(M1), ylab = 'Leverage (from hat matrix)', main = 'Distribution of leverage')
+```
+
+We can clearly see there is a single observation with much greater leverage than the other points. 
+
+#### Comparing models with and without outlier
+
+We proceed to fit models with and without this point:
+
+```{r}
+max_index = which(hatvalues(M1) == max(hatvalues(M1)))
+drop_high_lev = boys[-max_index,]
+
+all_boys_model = lm(boys$WT18 ~ boys$WT9)
+dropped_model = lm(drop_high_lev$WT18 ~ drop_high_lev$WT9)
+```
+
+The coefficients from the two models are shown below
+
+| Data | Intercept | Slope |
+|------|:---------:|:-----:|
+| With high leverage point | `r all_boys_model$coefficients[1]` | `r all_boys_model$coefficients[2]` |
+| Without high leverage point | `r dropped_model$coefficients[1]` | `r dropped_model$coefficients[2]` |
+
+#### Visualizing models
+
+Next, we plot the regression lines for these two models:
+
+```{r}
+plot(boys$WT9, boys$WT18, col=ifelse(boys$WT9 == max(boys$WT9), 'red', 'black'), xlab = 'Weight at age 9', ylab = 'Weight at age 18', main='Visualing effect of outlier')
+abline(all_boys_model, col='red')
+abline(dropped_model, col='green')
+legend('bottomright',legend = c('With outlier', 'Without outlier'), col = c('red', 'green'), lty=1)
+```
+
+#### Choosing and interpreting a model
+
+Based on the analysis above, it appears the model with the high leverage point removed better fits the data. However, this is a very tenuous assertion- to actually assess the model fits, I would probably want to use the models to predict weights at 18 using a hold-out validation set. Then I would chose the model that performs better on this hold-out set. If the high-leverage-point-removed model performed better, it would be stonger evidence that this observation was in fact anomalous, and not representative of the underlying population distribution.
+
+Given this choice, we can interpret the model as follows: given a unit increase in weight at age 9, the expected weight at age 18 increases by `r round(dropped_model$coefficients[2],2)`. Again, the intercept term doesn't have an interpretation this context (there are no instances of weight at age 9 equaling 0), so it can be most appropriately intrepreted as a bias term that increases the expressivity of the model.
+
+##3. Modeling girls' Somatype
+
+In this section, we model girls' Somatype using various feature sets.
+
+### (a) Ploting Somatype vs. weight at different ages.
+
+First, we plot Somatype against weight at different ages.
+
+```{r}
+girls = BGS[BGS$Sex == 1,]
+
+library(ggplot2)
+library(reshape2)
+meltGirls <- melt(girls[,c("Soma","WT2",'WT9','WT18')], id=c("Soma"))
+p <- ggplot(meltGirls, aes(value, Soma)) 
+p + geom_point(aes(x=value, y=Soma)) + facet_wrap(~variable, scale="free", nrow=1) + ylab('Soma') + xlab('Weights (ages 2, 9, and 18)')
+```
+
+Looking at these plots, it appears that there may be a stronger correlation between somatype and weight as age increases. However, it is not an particularly strong (or obvious) trend.
+
+### (b) Adding new features
+
+Next, we add new features to the girls dataset:
+
+```{r}
+girls[,'DW9'] = girls$WT9 - girls$WT2
+girls[,'DW18'] = girls$WT18 - girls$WT9
+girls[,'AVE'] = 1/3.0 * (girls$WT18 + girls$WT9 + girls$WT2)
+girls[,'LIN'] = girls$WT18 - girls$WT2
+girls[,'QUAD'] = girls$WT2 - 2 * girls$WT9 + girls$WT18
+```
+
+### (c) Fitting models using these "new" features
+
+Next, we use these new features to fit models:
+
+```{r}
+M1 = lm(girls$Soma ~ girls$WT2 + girls$WT9 + girls$WT18)
+M2 = lm(girls$Soma ~ girls$WT2 + girls$DW9 + girls$DW18)
+M3 = lm(girls$Soma ~ girls$AVE + girls$LIN + girls$QUAD)
+
+summary(M1)
+summary(M2)
+summary(M3)
+```
+
+Now we compare and contrast these models:
+
+#### Comparing attributes:
+
+First, these models all have the same attributes. This is because the "new" features we constructed are actually just linear combinations of our original weight features. Thus, even though we've made 'new' features, we can rewrite model $M1, M2,$ and $M3$ as functions of just $WT2, WT9,$ and $W18$. There are no different attributes.
+
+#### Coefficients on DW18 and DW9:
+
+In model $M2$, the coefficient on $DW18$ is $\beta_{DW18} =$ `r round(M2$coefficient[4],3)`. In model $M1$, the coefficient on $WT18$ is $\beta_{WT18} =$ `r round(M1$coefficient[4],3)`. We see these coefficients are equal- this is because $DW18 = WT18 - WT9$ is the only feature in $M2$ that contains $WT18$. Thus, to produce the same (i.e. optimal, sum-of-squared errors minimizing) model, $M2$ has to have the same coefficient on $DW18$ that $M1$ had on $WT18$.
+
+In contrast, in model $M2$, the coefficient on $DW9$ is $\beta_{DW9} =$ `r round(M2$coefficient[3],3)`, while in model $M1$, the coefficient on $WT9$ is $\beta_{WT9} =$ `r round(M1$coefficient[3],3)`. We see these coefficients are not equal. This is because $DW18 = WT18 - WT9$ and $DW9 = WT9 - WT2$ both contain $WT9$. Thus, to produce the same (i.e. optimal, sum-of-squared errors minimizing) model, $M2$ has to have the $\beta_{DW9} - \beta_{DW18} =$ `r round(M2$coefficient[3] - M2$coefficient[4],3)`, the coefficient of $WT18$ in $M1$.
+
+#### Show M1 and M3 are equivalent:
+
+We show that $M1$ and $M3$ are equivalent:
+
+$$
+\begin{align*}
+\hat{y} &= \beta_0 + \beta_{1} AVE + \beta_{2} LIN +
+\beta_{3} QUAD \\
+&= \beta_0 + \beta_{1} \left(1/3 (WT2 + WT9 + WT18)\right) + \beta_{2} \left(WT18 - WT2 \right) + \beta_{3} \left(WT2 - 2\cdot WT9 + WT18\right) \\
+&= \beta_0 + 1/3 \beta_{1} WT2 + 1/3 \beta_{1} WT9 + 1/3 \beta_{1} WT18 + \beta_{2} WT18 - \beta_{2} WT2 + \beta_{3} WT2 - 2\beta_{3} WT9 + \beta_{3} WT18 \\
+&= \beta_0 + 1/3 \beta_{1} WT2 - \beta_{2} WT2 + \beta_{3} WT2 + 1/3 \beta_{1} WT9 - 2\beta_{3} WT9 + 1/3 \beta_{1} WT18 + \beta_{2} WT18 + \beta_{3} WT18 \\
+&= \beta_0 + \left(1/3 \beta_{1} - \beta_{2} + \beta_{3}\right)WT2 + \left(1/3 \beta_{1} - 2\beta_{3} \right)WT9 + \left(1/3 \beta_{1} + \beta_{2} + \beta_{3}\right)WT18 \\
+\end{align*}
+$$
+Thus, we can obtain the coefficients in $M1$ by manipulating the coefficients in $M3$- we could set up a linear system to solve the other direction as well.
+
+### (d) Fitting another model
+
+Next we try to fit the model
+
+$$M4: Somatype \sim WT2 + WT9 + WT18 + DW9$$
+
+```{r}
+M4 = lm(girls$Soma ~ girls$WT2 + girls$WT9 + girls$WT18 + girls$DW9)
+
+summary(M4)
+```
+
+As we can see, the coefficient on $DW9$ is not estimated. This is not surprising- $DW9$ is linear combination of $WT9$ and $WT2$. Thus, including it in the design matrix makes $(X^TX)$ singular. As such, this column is dropped from the design matrix (making $(X^TX)$ full rank).
+
+[^1]: This expression was borrowed from http://math.bu.edu/people/cgineste/classes/ma575/p/w5_1.pdf, though I didn't explicitly use this reference for the assignment- in a previous context I'd read this handout and I remembered the phrase.

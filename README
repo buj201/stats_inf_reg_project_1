@@ -1,0 +1,8 @@
+Project 1 Read Me
+Author: Ben Jakubowski
+
+Note my assignment submission contains:
+
+1. final_report.pdf: This is my part 2 submission.
+2. project_1.html: This is my part 1 submission.
+3. final_report.R: This is the supplementary code for my part 2 submission. Please note I completed part 2 using rmarkdown (with echo=FALSE for all code blocks). Thus, this .R file lacks comments (which are not particularly informative in the context of a more literately-coded .rmd document). If this is considered insufficient for this assignment, I'd be happy to resubmit my original .rmd document.
